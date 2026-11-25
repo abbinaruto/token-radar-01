@@ -1,14 +1,19 @@
-// Token radar, model radar-2.
+// Token radar, model radar-3.
 //
 // Reads the sealed snapshot from /input/snapshot.json (or --input <file|dir>),
-// scores every pre-token protocol with the comps-fitted model in lib/model.ts,
-// writes the ranked board to /output/board.json, and copies this repository's
-// dashboard/ and screenshots/ to /output. Last, it writes /output/dossier.json,
-// the summary the judge reads, with the vendored make.fun library.
+// scores every pre-token protocol with the comps-fitted model in lib/model.ts
+// (launch value from the tight comparables, times 24-month token odds from the
+// peers' record), writes the ranked board to /output/board.json, and copies
+// this repository's dashboard/ and screenshots/ to /output. Last, it writes
+// /output/dossier.json, the summary the judge reads, with the vendored
+// make.fun library.
 //
 // The dashboard is a static page, no framework and no network: dashboard/index.html,
 // dashboard/app.css and dashboard/app.js read /output/data.js, which this program
-// writes from the same board, so the page and the board can never disagree.
+// writes from the same board, so the page and the board can never disagree. The
+// dashboard recomputes every implied value in the browser from the model
+// constants and checks the board's checksum, so a screen with no data behind it
+// cannot happen.
 //
 // Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:
 //   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts --input ../input/snapshot.json
@@ -106,9 +111,11 @@ if (roundTrip !== null) {
   process.exit(1);
 }
 
+const farm = { FARM: 0, MARGINAL: 0, SKIP: 0 };
+for (const r of board) farm[r.verdict]++;
 process.stdout.write(
-  `token radar: ${snapshot.protocols.length} protocols, ${snapshot.watchlist.length} on the watchlist, ${board.length} rows scored (${radar.early_size} early, ${radar.live_size} live set aside)\n` +
+  `token radar: ${snapshot.protocols.length} protocols, ${snapshot.watchlist.length} on the watchlist, ${board.length} rows scored (${radar.early_size} early, ${radar.off_list_size} off-list, ${radar.kin_excluded} kin set aside)\n` +
     `token radar: wrote ${join(out, 'board.json')}, ${join(out, 'data.js')}, ${join(out, 'dashboard')} (3 files), ${join(out, 'screenshots')} (${shots.length} images) and ${join(out, 'dossier.json')}\n` +
-    `token radar: top 5 implied values: ${board.slice(0, 5).map((r) => `${r.name} $${r.implied_value_usd.toLocaleString('en-US')}`).join(', ')}\n` +
-    `token radar: implied range $${board[board.length - 1]!.implied_value_usd.toLocaleString('en-US')} to $${board[0]!.implied_value_usd.toLocaleString('en-US')}, dashboard source ${dashBytes} bytes\n`,
+    `token radar: top 5 implied values: ${board.slice(0, 5).map((r) => `${r.name} $${r.implied_value_usd.toLocaleString('en-US')} (${Math.round(r.token_odds_24m * 100)}% odds)`).join(', ')}\n` +
+    `token radar: implied total $${radar.total_implied_usd.toLocaleString('en-US')}, verdicts FARM ${farm.FARM} / MARGINAL ${farm.MARGINAL} / SKIP ${farm.SKIP}, checksum ${radar.checksum}, dashboard source ${dashBytes} bytes\n`,
 );

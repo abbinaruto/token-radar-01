@@ -8,12 +8,16 @@
 </head>
 <body>
 <header class="top">
-  <div class="brand"><span class="pulse" aria-hidden="true"></span><span class="brand-name">TOKEN RADAR</span><span class="brand-model" id="modelTag">radar-2</span></div>
-  <h1>Which pre-token protocol is worth the most <em>if it launched tomorrow?</em></h1>
+  <div class="brand"><span class="pulse" aria-hidden="true"></span><span class="brand-name">TOKEN RADAR</span><span class="brand-model" id="modelTag">radar-3</span></div>
+  <h1>Which pre-token protocol is worth the most <em>if it launched — and if it launches at all?</em></h1>
   <p class="lede">Every protocol below records no token in the DefiLlama snapshot. The radar ranks them by an
-  implied launch value fitted from the 118 protocols in the same snapshot that already trade —
-  not from a flat multiple, not from a list of names.</p>
+  implied launch value fitted from the snapshot itself: a launch value from the 89 stand-alone protocols
+  that already trade, times the chance of a token within 24 months, read off the peers' own record.
+  Not a flat multiple, not a list of names.</p>
   <dl class="meta" id="meta"></dl>
+  <div class="kpis" id="kpis"></div>
+  <div class="accounting" id="accounting"></div>
+  <p class="integrity" id="integrity"></p>
 </header>
 
 <nav class="tabs" aria-label="Views">
@@ -25,38 +29,60 @@
 <main>
   <section id="view-board" class="view">
     <div class="filters">
+      <div class="verdicts" role="group" aria-label="Verdict filter">
+        <button type="button" data-verdict="" class="active">All <span id="cAll"></span></button>
+        <button type="button" data-verdict="FARM">Farm <span id="cFarm"></span></button>
+        <button type="button" data-verdict="MARGINAL">Marginal <span id="cMarg"></span></button>
+        <button type="button" data-verdict="SKIP">Skip <span id="cSkip"></span></button>
+      </div>
+      <div class="tiers" role="group" aria-label="Tier filter">
+        <button type="button" data-tier="" class="active">All tiers</button>
+        <button type="button" data-tier="watch">Watchlist</button>
+        <button type="button" data-tier="early">Early (&lt; $50M)</button>
+        <button type="button" data-tier="off">Off-list</button>
+      </div>
+      <div class="sliders">
+        <label>Deposit <input id="dep" type="range" min="1000" max="25000" step="1000" value="10000"><output id="depOut">$10,000</output></label>
+        <label>Drop share <input id="drop" type="range" min="1" max="20" step="0.5" value="7"><output id="dropOut">7.0%</output></label>
+        <label>Horizon <input id="horizon" type="range" min="4" max="26" step="1" value="12"><output id="horOut">12 wk</output></label>
+      </div>
       <label>Search <input id="q" type="search" placeholder="protocol or category" autocomplete="off"></label>
       <label>Category <select id="cat"><option value="">All categories</option></select></label>
-      <label class="check"><input id="watchOnly" type="checkbox"> Watchlist only</label>
-      <label class="check"><input id="earlyOnly" type="checkbox"> Early only</label>
+      <label>Chain <select id="chain"><option value="">All chains</option></select></label>
+      <button type="button" id="reset">Reset</button>
+      <button type="button" id="csv">CSV</button>
+      <button type="button" id="json">JSON</button>
       <span class="count" id="count"></span>
     </div>
     <div class="table-wrap">
       <table id="board">
         <thead><tr>
-          <th data-sort="rank" aria-sort="ascending">Rank</th>
+          <th data-sort="rank" aria-sort="ascending">#</th>
           <th data-sort="name">Protocol</th>
-          <th data-sort="category">Category</th>
-          <th data-sort="chains">Chains</th>
           <th data-sort="tvl_usd" class="num">TVL</th>
           <th data-sort="change_7d" class="num">7d</th>
-          <th data-sort="age_days" class="num">Age</th>
-          <th data-sort="implied_value_usd" class="num">Implied value</th>
+          <th data-sort="age_days" class="num">No-token age</th>
+          <th data-sort="token_odds_24m" class="num">Token odds</th>
+          <th data-sort="launch_value_usd" class="num">If it launches</th>
+          <th data-sort="implied_value_usd" class="num">Implied value · P25–P75</th>
+          <th data-sort="verdict" class="num">Verdict · Net of fees</th>
+          <th data-sort="net_per_hour_usd" class="num">Net / hour</th>
         </tr></thead>
         <tbody id="rows"></tbody>
       </table>
     </div>
-    <p class="hint">Click a row for its farm plan. Implied values are whole dollars, ranked highest first.</p>
+    <p class="hint">Click a row for how its figure is made, its nearest priced peers and its farm plan. Implied value = launch value × 24-month token odds. Verdicts follow the deposit, drop-share and horizon sliders above.</p>
     <article id="detail" class="detail" hidden></article>
   </section>
 
   <section id="view-live" class="view" hidden>
-    <p class="lede">These protocols already trade, so the board shows the market's own value for them —
-    never a model's guess. They are the comparables the model was fitted on, shown apart so the
-    ranking is never mixed with live prices.</p>
+    <p class="lede">These 89 protocols already trade, so the board shows the market's own value for them —
+    never a model's guess. They are the comparables the launch value was fitted on, shown apart so the
+    ranking is never mixed with live prices. Model-blind is the market cap divided by the model's own
+    launch value for that protocol: 1.00 is exactly what the model would have priced it at.</p>
     <div class="table-wrap">
       <table id="liveTable">
-        <thead><tr><th>Protocol</th><th>Category</th><th>Chains</th><th class="num">TVL</th><th class="num">Market cap</th><th class="num">7d</th></tr></thead>
+        <thead><tr><th>Protocol</th><th>Category</th><th>Chains</th><th class="num">TVL</th><th class="num">Market cap</th><th class="num">7d</th><th class="num">Model-blind</th></tr></thead>
         <tbody id="liveRows"></tbody>
       </table>
     </div>
@@ -64,28 +90,43 @@
 
   <section id="view-model" class="view" hidden>
     <h2>The model</h2>
-    <p class="formula">ln(implied value) = <span id="fIntercept">7.9295</span> + <span id="fSlope">0.4617</span> &times; ln(TVL)
-      + <span id="fTilt">0.25</span> &times; clamp(7d change, &minus;60%, +120%) / 100</p>
-    <p>Value grows <strong>sublinearly</strong> with TVL: doubling TVL lifts implied value by about 38%.
-    The 7-day tilt is small on purpose — one hot week should not decide a launch value. Age was tested
-    and left out: it made held-out predictions worse, so it sets the farm plan's hold length instead.</p>
-    <h2>Validation — fitted, then tested blind</h2>
-    <dl class="stats" id="validation"></dl>
+    <p class="formula">ln(launch value) = <span id="fIntercept">9.8108</span> + <span id="fSlope">0.3902</span> &times; ln(TVL)
+      &minus; <span id="fChain">0.5463</span> &times; ln(min(chains, 5) + 1)</p>
+    <p>Value grows <strong>sublinearly</strong> with TVL: doubling TVL lifts launch value by about 31%.
+    A protocol spread over many chains is worth less per dollar of TVL — its TVL double-counts bridged
+    assets — so the chain count enters with a negative coefficient, capped at five chains because the
+    sixth adds no signal. Implied value is launch value &times; token odds, where the odds are the chance
+    of a token within 24 months from a logistic model on the snapshot's own 447 stand-alone peers
+    (years listed, TVL, 7-day growth), turned into a forward probability with
+    (F(age+2) &minus; F(age)) / (1 &minus; F(age)). Odds fall with age: a protocol that has run three
+    years with no token is less likely to launch next than one that has run three months.</p>
+    <h2>Out-of-sample evidence — the value model</h2>
+    <p class="fine">A term is kept only if it lowers the held-out miss on <em>both</em> the leave-one-out
+    test and the walk-forward test (tokens listed earlier price those listed later). The control term —
+    another row's 7-day growth — is the tripwire: it looks harmless leave-one-out and wrecks the
+    walk-forward test, which is why the walk-forward test is the one the model has to pass.</p>
+    <div class="table-wrap"><table id="evValue" class="evidence"></table></div>
+    <h2>Out-of-sample evidence — the token odds</h2>
+    <div class="table-wrap"><table id="evOdds" class="evidence"></table></div>
+    <h2>Is the printed range honest?</h2>
+    <p id="rangeNote" class="fine"></p>
     <h2>What was tried and rejected</h2>
     <ul id="rejected"></ul>
     <h2>Try it yourself</h2>
-    <p>Move the constants and watch the top 10 re-rank. This changes nothing on the board above —
-    the board is fixed to the fitted constants. It shows how much the ranking depends on each term.</p>
+    <p>Move the constants and watch the top 10 re-rank by launch value. This changes nothing on the
+    board above — the board is fixed to the fitted constants. It shows how much the ranking depends on
+    each term.</p>
     <div class="sandbox">
-      <label>Intercept <input id="sbIntercept" type="range" min="6" max="10" step="0.1" value="7.9295"><output id="sbInterceptOut">7.93</output></label>
-      <label>TVL slope <input id="sbSlope" type="range" min="0.2" max="0.8" step="0.01" value="0.4617"><output id="sbSlopeOut">0.46</output></label>
-      <label>Growth tilt <input id="sbTilt" type="range" min="0" max="1" step="0.05" value="0.25"><output id="sbTiltOut">0.25</output></label>
+      <label>Intercept <input id="sbIntercept" type="range" min="8" max="11" step="0.05" value="9.810766"><output id="sbInterceptOut">9.81</output></label>
+      <label>TVL slope <input id="sbSlope" type="range" min="0.2" max="0.6" step="0.01" value="0.390175"><output id="sbSlopeOut">0.39</output></label>
+      <label>Chain coef <input id="sbChain" type="range" min="-1" max="0" step="0.05" value="-0.546313"><output id="sbChainOut">-0.55</output></label>
       <button type="button" id="sbReset">Reset to fitted constants</button>
     </div>
     <ol id="sandboxTop" class="sandbox-top"></ol>
     <p class="fine">Snapshot: DefiLlama protocols, frozen 2026-11-14. “Records no token” means the snapshot
     carries no market cap, CoinGecko id or symbol for a protocol — it is a statement about the record,
-    not proof no token exists. Farm plans are research notes, not financial advice.</p>
+    not proof no token exists. Farm plans and verdicts are research notes, not financial advice; the
+    expected drop is shared pro-rata by TVL, so treat it as an upper bound — other farmers dilute it.</p>
   </section>
 </main>
 
